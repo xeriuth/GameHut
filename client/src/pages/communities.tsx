@@ -8,6 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -16,6 +19,10 @@ export default function Communities() {
   const { isAuthenticated, isLoading } = useAuth();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [communityName, setCommunityName] = useState('');
+  const [communityDescription, setCommunityDescription] = useState('');
+  const [isPrivate, setIsPrivate] = useState(false);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -32,12 +39,12 @@ export default function Communities() {
     }
   }, [isAuthenticated, isLoading, toast]);
 
-  const { data: communities, isLoading: communitiesLoading } = useQuery({
+  const { data: communities = [], isLoading: communitiesLoading } = useQuery({
     queryKey: ["/api/communities"],
     enabled: isAuthenticated,
   });
 
-  const { data: userCommunities } = useQuery({
+  const { data: userCommunities = [] } = useQuery({
     queryKey: ["/api/users/communities"],
     enabled: isAuthenticated,
   });
@@ -106,14 +113,67 @@ export default function Communities() {
     },
   });
 
-  const isUserInCommunity = (communityId: string) => {
-    return userCommunities?.some((uc: any) => uc.id === communityId);
+  const createCommunityMutation = useMutation({
+    mutationFn: async (communityData: any) => {
+      await apiRequest("POST", "/api/communities", communityData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/communities"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users/communities"] });
+      setShowCreateDialog(false);
+      setCommunityName('');
+      setCommunityDescription('');
+      setIsPrivate(false);
+      toast({
+        title: "Community Created",
+        description: "Your community has been created successfully!",
+      });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error as Error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Error",
+        description: "Failed to create community. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleCreateCommunity = () => {
+    if (!communityName.trim()) {
+      toast({
+        title: "Missing Information",
+        description: "Please enter a community name.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    createCommunityMutation.mutate({
+      name: communityName.trim(),
+      description: communityDescription.trim(),
+      isPrivate,
+    });
   };
 
-  const filteredCommunities = communities?.filter((community: any) =>
+  const isUserInCommunity = (communityId: string) => {
+    return Array.isArray(userCommunities) && userCommunities.some((uc: any) => uc.id === communityId);
+  };
+
+  const filteredCommunities = Array.isArray(communities) ? communities.filter((community: any) =>
     community.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     community.description?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  ) : [];
 
   if (isLoading) {
     return (
@@ -143,7 +203,10 @@ export default function Communities() {
                 <h1 className="text-3xl font-bold text-foreground">Gaming Communities</h1>
                 <p className="text-muted-foreground">Discover and join communities for your favorite games</p>
               </div>
-              <Button className="bg-primary hover:bg-primary/90 text-primary-foreground gaming-glow">
+              <Button 
+                className="bg-primary hover:bg-primary/90 text-primary-foreground gaming-glow"
+                onClick={() => setShowCreateDialog(true)}
+              >
                 <i className="fas fa-plus mr-2"></i>
                 Create Community
               </Button>
@@ -166,7 +229,7 @@ export default function Communities() {
             </Card>
 
             {/* My Communities */}
-            {userCommunities && userCommunities.length > 0 && (
+            {Array.isArray(userCommunities) && userCommunities.length > 0 && (
               <Card className="bg-card border-border">
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2">
@@ -223,7 +286,7 @@ export default function Communities() {
                   <div className="text-center py-8">
                     <p className="text-muted-foreground">Loading communities...</p>
                   </div>
-                ) : filteredCommunities && filteredCommunities.length > 0 ? (
+                ) : Array.isArray(filteredCommunities) && filteredCommunities.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {filteredCommunities.map((community: any) => (
                       <div
@@ -283,6 +346,64 @@ export default function Communities() {
           </div>
         </div>
       </main>
+      
+      {/* Create Community Dialog */}
+      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Create New Community</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="community-name">Community Name</Label>
+              <Input
+                id="community-name"
+                placeholder="Enter community name..."
+                value={communityName}
+                onChange={(e) => setCommunityName(e.target.value)}
+                data-testid="input-community-name"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="community-description">Description</Label>
+              <Textarea
+                id="community-description"
+                placeholder="Describe your community..."
+                value={communityDescription}
+                onChange={(e) => setCommunityDescription(e.target.value)}
+                data-testid="textarea-community-description"
+                rows={3}
+              />
+            </div>
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="is-private"
+                checked={isPrivate}
+                onChange={(e) => setIsPrivate(e.target.checked)}
+                className="rounded border-gray-300"
+                data-testid="checkbox-is-private"
+              />
+              <Label htmlFor="is-private">Make this community private</Label>
+            </div>
+          </div>
+          <div className="flex justify-end space-x-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowCreateDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleCreateCommunity}
+              disabled={createCommunityMutation.isPending}
+              data-testid="button-create-community"
+            >
+              {createCommunityMutation.isPending ? "Creating..." : "Create Community"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
