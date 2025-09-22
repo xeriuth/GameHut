@@ -7,7 +7,8 @@ import {
   integer, 
   boolean,
   jsonb,
-  index
+  index,
+  unique
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
@@ -271,3 +272,16 @@ export type PostComment = typeof postComments.$inferSelect;
 export type InsertPostComment = z.infer<typeof insertPostCommentSchema>;
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+
+// Tournament participants table for proper join tracking
+export const tournamentParticipants = pgTable("tournament_participants", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tournamentId: varchar("tournament_id").notNull().references(() => posts.id),
+  userId: varchar("user_id").notNull(),
+  joinedAt: timestamp("joined_at").defaultNow(),
+}, (table) => ({
+  uniqueParticipant: unique().on(table.tournamentId, table.userId),
+}));
+
+export type TournamentParticipant = typeof tournamentParticipants.$inferSelect;
+export type TournamentParticipantInsert = typeof tournamentParticipants.$inferInsert;

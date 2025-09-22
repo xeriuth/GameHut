@@ -32,12 +32,12 @@ export default function GameLibrary() {
     }
   }, [isAuthenticated, isLoading, toast]);
 
-  const { data: userGames, isLoading: userGamesLoading } = useQuery({
+  const { data: userGames = [], isLoading: userGamesLoading } = useQuery({
     queryKey: ["/api/users/games"],
     enabled: isAuthenticated,
   });
 
-  const { data: allGames } = useQuery({
+  const { data: allGames = [] } = useQuery({
     queryKey: ["/api/games"],
     enabled: isAuthenticated,
   });
@@ -124,7 +124,7 @@ export default function GameLibrary() {
   });
 
   const isGameInLibrary = (gameId: string) => {
-    return userGames?.some((userGame: any) => userGame.gameId === gameId);
+    return Array.isArray(userGames) && userGames.some((userGame: any) => userGame.gameId === gameId);
   };
 
   const handleSearch = (query: string) => {
@@ -135,7 +135,7 @@ export default function GameLibrary() {
   };
 
   const searchResults = searchGamesMutation.data || [];
-  const favoriteGames = userGames?.filter((game: any) => game.isFavorite) || [];
+  const favoriteGames = Array.isArray(userGames) ? userGames.filter((game: any) => game.isFavorite) : [];
 
   if (isLoading) {
     return (
@@ -276,7 +276,7 @@ export default function GameLibrary() {
                 <CardTitle className="flex items-center space-x-2">
                   <i className="fas fa-gamepad text-primary"></i>
                   <span>My Games</span>
-                  {userGames && <Badge variant="secondary">{userGames.length}</Badge>}
+                  {Array.isArray(userGames) && <Badge variant="secondary">{userGames.length}</Badge>}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -284,7 +284,7 @@ export default function GameLibrary() {
                   <div className="text-center py-8">
                     <p className="text-muted-foreground">Loading your games...</p>
                   </div>
-                ) : userGames && userGames.length > 0 ? (
+                ) : Array.isArray(userGames) && userGames.length > 0 ? (
                   <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
                     {userGames.map((userGame: any) => (
                       <div

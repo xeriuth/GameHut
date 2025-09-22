@@ -34,17 +34,17 @@ export default function Friends() {
     }
   }, [isAuthenticated, isLoading, toast]);
 
-  const { data: friends, isLoading: friendsLoading } = useQuery({
+  const { data: friends = [], isLoading: friendsLoading } = useQuery({
     queryKey: ["/api/friends"],
     enabled: isAuthenticated,
   });
 
-  const { data: onlineFriends } = useQuery({
+  const { data: onlineFriends = [] } = useQuery({
     queryKey: ["/api/friends/online"],
     enabled: isAuthenticated,
   });
 
-  const { data: friendRequests } = useQuery({
+  const { data: friendRequests = [] } = useQuery({
     queryKey: ["/api/friends/requests"],
     enabled: isAuthenticated,
   });
@@ -242,7 +242,7 @@ export default function Friends() {
             </Card>
 
             {/* Friend Requests */}
-            {friendRequests && friendRequests.length > 0 && (
+            {Array.isArray(friendRequests) && friendRequests.length > 0 && (
               <Card className="bg-card border-border">
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2">
@@ -297,7 +297,7 @@ export default function Friends() {
             )}
 
             {/* Online Friends */}
-            {onlineFriends && onlineFriends.length > 0 && (
+            {Array.isArray(onlineFriends) && onlineFriends.length > 0 && (
               <Card className="bg-card border-border">
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2">
@@ -340,7 +340,7 @@ export default function Friends() {
                 <CardTitle className="flex items-center space-x-2">
                   <i className="fas fa-users text-primary"></i>
                   <span>All Friends</span>
-                  {friends && <Badge variant="secondary">{friends.length}</Badge>}
+                  {Array.isArray(friends) && <Badge variant="secondary">{friends.length}</Badge>}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -348,7 +348,7 @@ export default function Friends() {
                   <div className="text-center py-8">
                     <p className="text-muted-foreground">Loading friends...</p>
                   </div>
-                ) : friends && friends.length > 0 ? (
+                ) : Array.isArray(friends) && friends.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {friends.map((friend: any) => (
                       <div

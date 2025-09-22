@@ -1,6 +1,9 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { db } from "./db";
+import { communityMembers } from "@shared/schema";
+import { and, eq } from "drizzle-orm";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { insertPostSchema, insertCommunitySchema, insertGameSchema, insertPostCommentSchema } from "@shared/schema";
 
@@ -47,10 +50,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Post routes
-  app.get('/api/posts', async (req, res) => {
+  // Tournament routes
+  app.post('/api/tournaments/:id/join', isAuthenticated, async (req: any, res) => {
     try {
-      const posts = await storage.getAllPosts();
+      const userId = req.user.claims.sub;
+      const { id: tournamentId } = req.params;
+      
+      // Get tournament post
+      const tournament = await storage.getPost(tournamentId);
+      if (!tournament || tournament.postType !== 'tournament') {
+        return res.status(404).json({ message: "Tournament not found" });
+      }
+      
+      // Check if already joined tournament  
+      const isAlreadyJoined = await storage.isUserInTournament(tournamentId, userId);
+      if (isAlreadyJoined) {
+        return res.status(400).json({ message: "Already joined this tournament" });
+      }
+      
+      // Join tournament (add participant)
+      await storage.joinTournament(tournamentId, userId);
+      res.json({ message: "Successfully joined tournament" });
+    } catch (error) {
+      console.error("Error joining tournament:", error);
+      res.status(500).json({ message: "Failed to join tournament" });
+    }
+  });
+
+  app.post('/api/tournaments/:id/leave', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id: tournamentId } = req.params;
+      
+      // Leave tournament (remove participant)
+      await storage.leaveTournament(tournamentId, userId);
+      res.json({ message: "Successfully left tournament" });
+    } catch (error) {
+      console.error("Error leaving tournament:", error);
+      res.status(500).json({ message: "Failed to leave tournament" });
+    }
+  });
+
+  // Post routes
+  app.get('/api/posts', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const posts = await storage.getPostsFromUserCommunities(userId);
       res.json(posts);
     } catch (error) {
       console.error("Error fetching posts:", error);
@@ -190,6 +235,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         adminUserId: userId 
       });
       const community = await storage.createCommunity(communityData);
+      
+      // Auto-add creator as the first member with admin role
+      await storage.joinCommunity(community.id, userId);
+      await db.update(communityMembers)
+        .set({ role: 'admin' })
+        .where(and(
+          eq(communityMembers.communityId, community.id),
+          eq(communityMembers.userId, userId)
+        ));
+      
       res.status(201).json(community);
     } catch (error) {
       console.error("Error creating community:", error);

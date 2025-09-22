@@ -9,6 +9,7 @@ import {
   postComments,
   communityMembers,
   notifications,
+  tournamentParticipants,
   type User,
   type UpsertUser,
   type Game,
@@ -528,6 +529,61 @@ export class DatabaseStorage implements IStorage {
         ilike(users.firstName, `%${query}%`),
         ilike(users.lastName, `%${query}%`)
       ));
+  }
+
+  // Tournament participants operations
+  async joinTournament(tournamentId: string, userId: string): Promise<void> {
+    await db.insert(tournamentParticipants).values({
+      tournamentId,
+      userId,
+    });
+  }
+
+  async leaveTournament(tournamentId: string, userId: string): Promise<void> {
+    await db
+      .delete(tournamentParticipants)
+      .where(and(
+        eq(tournamentParticipants.tournamentId, tournamentId),
+        eq(tournamentParticipants.userId, userId)
+      ));
+  }
+
+  async isUserInTournament(tournamentId: string, userId: string): Promise<boolean> {
+    const result = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(tournamentParticipants)
+      .where(and(
+        eq(tournamentParticipants.tournamentId, tournamentId),
+        eq(tournamentParticipants.userId, userId)
+      ));
+    return result[0].count > 0;
+  }
+
+  // Get posts from user's communities (Reddit-like feed)
+  async getPostsFromUserCommunities(userId: string): Promise<Post[]> {
+    const result = await db
+      .select({
+        id: posts.id,
+        userId: posts.userId,
+        communityId: posts.communityId,
+        gameId: posts.gameId,
+        title: posts.title,
+        content: posts.content,
+        imageUrl: posts.imageUrl,
+        videoUrl: posts.videoUrl,
+        postType: posts.postType,
+        likesCount: posts.likesCount,
+        commentsCount: posts.commentsCount,
+        sharesCount: posts.sharesCount,
+        createdAt: posts.createdAt,
+        updatedAt: posts.updatedAt,
+      })
+      .from(posts)
+      .innerJoin(communityMembers, eq(posts.communityId, communityMembers.communityId))
+      .where(eq(communityMembers.userId, userId))
+      .orderBy(desc(posts.createdAt));
+    
+    return result;
   }
 }
 

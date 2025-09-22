@@ -11,6 +11,8 @@ import Profile from "@/pages/profile";
 import Communities from "@/pages/communities";
 import Friends from "@/pages/friends";
 import GameLibrary from "@/pages/game-library";
+import Tournaments from "@/pages/tournaments";
+import Clips from "@/pages/clips";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -26,6 +28,8 @@ function Router() {
           <Route path="/communities" component={Communities} />
           <Route path="/friends" component={Friends} />
           <Route path="/library" component={GameLibrary} />
+          <Route path="/tournaments" component={Tournaments} />
+          <Route path="/clips" component={Clips} />
         </>
       )}
       <Route component={NotFound} />
